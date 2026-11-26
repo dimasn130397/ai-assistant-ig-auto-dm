@@ -6,10 +6,10 @@ import type { CreateAutomationInput, IgAutomation } from '@/types/automation';
 const INITIAL_FORM: CreateAutomationInput = {
   keyword: '',
   target_url: '',
-  comment_reply: 'Cek DM ya, link sudah dikirim ke pesan masuk kamu.',
+  comment_reply: 'Check your DMs! I just sent the link over.',
   gate_message:
-    'Follow akun ini terlebih dahulu untuk membuka akses link, lalu tekan tombol konfirmasi di bawah.',
-  success_message: 'Terima kasih sudah follow. Silakan buka link melalui tombol di bawah:',
+    'Hey! Follow this account first, then tap the button below to unlock your link.',
+  success_message: 'Thanks for following! Tap the button below to access your link:',
 };
 
 export default function DashboardPage() {

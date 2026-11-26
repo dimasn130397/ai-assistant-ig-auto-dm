@@ -4,7 +4,13 @@ import type { IgAutomation, IgUserState } from '@/types/automation';
 
 const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0';
 const VERIFY_FOLLOW_PAYLOAD = 'VERIFY_FOLLOW';
-const VERIFY_FOLLOW_BUTTON_TITLE = 'Udah follow 🙌';
+const VERIFY_FOLLOW_BUTTON_TITLE = "I've Followed ✅";
+const DEFAULT_GATE_MESSAGE =
+  'Hey! Follow this account first, then tap the button below to unlock your link 👇';
+const NOT_FOLLOWING_REMINDER_MESSAGE =
+  "Looks like you haven't followed yet! Hit follow first, then tap the button below to unlock your link 👇";
+const DEFAULT_SUCCESS_MESSAGE =
+  'Thanks for following! Tap the button below to access your link:';
 
 interface MetaCommentValue {
   id?: string;
@@ -181,7 +187,7 @@ async function sendSuccessLinkDm(
       {
         type: 'web_url',
         url: targetUrl,
-        title: 'Buka Link',
+        title: 'Open Link',
       },
     ],
     accessToken,
@@ -306,7 +312,7 @@ async function handleCommentChange(
   await sendFollowerGateDm(
     entryId,
     { comment_id: commentId },
-    matched.gate_message,
+    matched.gate_message?.trim() || DEFAULT_GATE_MESSAGE,
     accessToken
   );
 }
@@ -316,7 +322,11 @@ async function handlePostbackEvent(
   event: MetaMessagingEvent,
   accessToken: string
 ): Promise<void> {
-  if (event.postback?.payload !== VERIFY_FOLLOW_PAYLOAD) {
+  const isVerifyFollowPostback =
+    event.postback?.payload === VERIFY_FOLLOW_PAYLOAD ||
+    event.postback?.title === VERIFY_FOLLOW_BUTTON_TITLE;
+
+  if (!isVerifyFollowPostback) {
     return;
   }
 
@@ -371,7 +381,7 @@ async function handlePostbackEvent(
     await sendSuccessLinkDm(
       igAccountId,
       igUserId,
-      automation.success_message,
+      automation.success_message?.trim() || DEFAULT_SUCCESS_MESSAGE,
       automation.target_url,
       accessToken
     );
@@ -381,7 +391,7 @@ async function handlePostbackEvent(
   await sendFollowerGateDm(
     igAccountId,
     { id: igUserId },
-    automation.gate_message,
+    NOT_FOLLOWING_REMINDER_MESSAGE,
     accessToken
   );
 }
