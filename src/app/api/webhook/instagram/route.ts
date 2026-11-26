@@ -106,71 +106,87 @@ async function replyToComment(
   }
 }
 
+type DmButton =
+  | { type: 'postback'; title: string; payload: string }
+  | { type: 'web_url'; url: string; title: string };
+
+async function sendButtonTemplateDm(
+  igAccountId: string,
+  recipient: DmRecipient,
+  text: string,
+  buttons: DmButton[],
+  accessToken: string,
+  contextLabel: string
+): Promise<void> {
+  const res = await callGraphApi(
+    `/${encodeURIComponent(igAccountId)}/messages`,
+    accessToken,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        recipient,
+        message: {
+          attachment: {
+            type: 'template',
+            payload: {
+              template_type: 'button',
+              text,
+              buttons,
+            },
+          },
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    console.error(`[IG Webhook] Failed to send ${contextLabel}:`, res.error);
+  }
+}
+
 async function sendFollowerGateDm(
+  igAccountId: string,
   recipient: DmRecipient,
   gateMessage: string,
   accessToken: string
 ): Promise<void> {
-  const res = await callGraphApi('/me/messages', accessToken, {
-    method: 'POST',
-    body: JSON.stringify({
-      recipient,
-      message: {
-        attachment: {
-          type: 'template',
-          payload: {
-            template_type: 'button',
-            text: gateMessage,
-            buttons: [
-              {
-                type: 'postback',
-                title: VERIFY_FOLLOW_BUTTON_TITLE,
-                payload: VERIFY_FOLLOW_PAYLOAD,
-              },
-            ],
-          },
-        },
+  await sendButtonTemplateDm(
+    igAccountId,
+    recipient,
+    gateMessage,
+    [
+      {
+        type: 'postback',
+        title: VERIFY_FOLLOW_BUTTON_TITLE,
+        payload: VERIFY_FOLLOW_PAYLOAD,
       },
-    }),
-  });
-
-  if (!res.ok) {
-    console.error('[IG Webhook] Failed to send follower gate DM:', res.error);
-  }
+    ],
+    accessToken,
+    'follower gate DM'
+  );
 }
 
 async function sendSuccessLinkDm(
+  igAccountId: string,
   igUserId: string,
   successMessage: string,
   targetUrl: string,
   accessToken: string
 ): Promise<void> {
-  const res = await callGraphApi('/me/messages', accessToken, {
-    method: 'POST',
-    body: JSON.stringify({
-      recipient: { id: igUserId },
-      message: {
-        attachment: {
-          type: 'template',
-          payload: {
-            template_type: 'button',
-            text: successMessage,
-            buttons: [
-              {
-                type: 'web_url',
-                url: targetUrl,
-                title: 'Buka Link',
-              },
-            ],
-          },
-        },
+  await sendButtonTemplateDm(
+    igAccountId,
+    { id: igUserId },
+    successMessage,
+    [
+      {
+        type: 'web_url',
+        url: targetUrl,
+        title: 'Buka Link',
       },
-    }),
-  });
-
-  if (!res.ok) {
-    console.error('[IG Webhook] Failed to send success link DM:', res.error);
-  }
+    ],
+    accessToken,
+    'success link DM'
+  );
 }
 
 async function checkIsUserFollowing(
@@ -279,7 +295,16 @@ async function handleCommentChange(
   }
 
   await replyToComment(commentId, matched.comment_reply, accessToken);
+
+  if (!entryId) {
+    console.error(
+      '[IG Webhook] Missing entry.id (IG Business Account ID) for sending Private Reply DM.'
+    );
+    return;
+  }
+
   await sendFollowerGateDm(
+    entryId,
     { comment_id: commentId },
     matched.gate_message,
     accessToken
@@ -287,6 +312,7 @@ async function handleCommentChange(
 }
 
 async function handlePostbackEvent(
+  entryId: string | undefined,
   event: MetaMessagingEvent,
   accessToken: string
 ): Promise<void> {
@@ -295,7 +321,11 @@ async function handlePostbackEvent(
   }
 
   const igUserId = event.sender?.id;
-  if (!igUserId) {
+  const igAccountId = entryId ?? event.recipient?.id;
+  if (!igUserId || !igAccountId) {
+    console.error(
+      '[IG Webhook] Missing sender.id or IG Business Account ID (entry.id) in postback event.'
+    );
     return;
   }
 
@@ -339,6 +369,7 @@ async function handlePostbackEvent(
     }
 
     await sendSuccessLinkDm(
+      igAccountId,
       igUserId,
       automation.success_message,
       automation.target_url,
@@ -348,6 +379,7 @@ async function handlePostbackEvent(
   }
 
   await sendFollowerGateDm(
+    igAccountId,
     { id: igUserId },
     automation.gate_message,
     accessToken
@@ -441,7 +473,7 @@ export async function POST(request: NextRequest) {
     }
 
     for (const event of entry.messaging ?? []) {
-      await handlePostbackEvent(event, accessToken);
+      await handlePostbackEvent(entry.id, event, accessToken);
     }
   }
 
