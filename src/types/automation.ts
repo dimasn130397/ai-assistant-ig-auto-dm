@@ -12,13 +12,10 @@ export interface IgAutomation {
 }
 
 export interface IgUserState {
-  id: string;
   ig_user_id: string;
-  ig_username: string | null;
+  username: string | null;
   last_automation_id: string | null;
-  comment_id: string | null;
-  status: 'pending' | 'verified';
-  created_at: string;
+  is_follower: boolean;
   updated_at: string;
 }
 

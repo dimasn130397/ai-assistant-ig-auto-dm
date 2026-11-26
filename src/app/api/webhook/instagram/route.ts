@@ -253,10 +253,10 @@ async function handleCommentChange(
   const { error: stateError } = await supabase.from('ig_user_states').upsert(
     {
       ig_user_id: fromId,
-      ig_username: fromUsername,
+      username: fromUsername,
       last_automation_id: matched.id,
-      comment_id: commentId,
-      status: 'pending',
+      is_follower: false,
+      updated_at: new Date().toISOString(),
     },
     { onConflict: 'ig_user_id' }
   );
@@ -328,7 +328,10 @@ async function handlePostbackEvent(
   if (isFollowing) {
     const { error: updateError } = await supabase
       .from('ig_user_states')
-      .update({ status: 'verified' })
+      .update({
+        is_follower: true,
+        updated_at: new Date().toISOString(),
+      })
       .eq('ig_user_id', igUserId);
 
     if (updateError) {

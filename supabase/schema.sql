@@ -20,13 +20,10 @@ create unique index if not exists idx_ig_automations_keyword_lower
   on public.ig_automations (lower(keyword));
 
 create table if not exists public.ig_user_states (
-  id uuid primary key default gen_random_uuid(),
-  ig_user_id text not null unique,
-  ig_username text,
-  last_automation_id uuid not null references public.ig_automations(id) on delete cascade,
-  comment_id text,
-  status text not null default 'pending' check (status in ('pending', 'verified')),
-  created_at timestamptz not null default now(),
+  ig_user_id text primary key,
+  username text,
+  last_automation_id uuid references public.ig_automations(id) on delete cascade,
+  is_follower boolean not null default false,
   updated_at timestamptz not null default now()
 );
 
