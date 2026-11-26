@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin, isSupabaseConfigured } from '@/lib/supabase';
 import type { IgAutomation, IgUserState } from '@/types/automation';
 
-const GRAPH_API_BASE = 'https://graph.instagram.com/v21.0';
+const GRAPH_API_BASE = 'https://graph.facebook.com/v21.0';
 const VERIFY_FOLLOW_PAYLOAD = 'VERIFY_FOLLOW';
 const VERIFY_FOLLOW_BUTTON_TITLE = 'Udah follow 🙌';
 
