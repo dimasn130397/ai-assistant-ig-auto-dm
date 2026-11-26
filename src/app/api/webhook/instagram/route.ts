@@ -10,7 +10,8 @@ const DEFAULT_GATE_MESSAGE =
 const NOT_FOLLOWING_REMINDER_MESSAGE =
   "Looks like you haven't followed yet! Hit follow first, then tap the button below to unlock your link 👇";
 const DEFAULT_SUCCESS_MESSAGE =
-  'Thanks for following! Tap the button below to access your link:';
+  "You're all set! Thanks for following — tap the button below to open your link 👇";
+const FALLBACK_TARGET_URL = 'https://www.englishaidol.com/go/dimas-70a3dc1a';
 
 interface MetaCommentValue {
   id?: string;
@@ -37,6 +38,12 @@ interface MetaMessagingEvent {
     id?: string;
   };
   timestamp?: number;
+  message?: {
+    text?: string;
+    quick_reply?: {
+      payload?: string;
+    };
+  };
   postback?: {
     title?: string;
     payload?: string;
@@ -172,6 +179,28 @@ async function sendFollowerGateDm(
   );
 }
 
+function resolveTargetUrl(
+  automation: Partial<IgAutomation> & Record<string, unknown>
+): string {
+  const candidates = [
+    automation.target_url,
+    automation.url,
+    automation.link_url,
+    automation.redirect_url,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim();
+      if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+      }
+    }
+  }
+
+  return FALLBACK_TARGET_URL;
+}
+
 async function sendSuccessLinkDm(
   igAccountId: string,
   igUserId: string,
@@ -179,6 +208,10 @@ async function sendSuccessLinkDm(
   targetUrl: string,
   accessToken: string
 ): Promise<void> {
+  const safeTargetUrl = /^https?:\/\//i.test(targetUrl.trim())
+    ? targetUrl.trim()
+    : FALLBACK_TARGET_URL;
+
   await sendButtonTemplateDm(
     igAccountId,
     { id: igUserId },
@@ -186,8 +219,8 @@ async function sendSuccessLinkDm(
     [
       {
         type: 'web_url',
-        url: targetUrl,
-        title: 'Open Link',
+        url: safeTargetUrl,
+        title: 'Open Link 🔗',
       },
     ],
     accessToken,
@@ -322,11 +355,13 @@ async function handlePostbackEvent(
   event: MetaMessagingEvent,
   accessToken: string
 ): Promise<void> {
-  const isVerifyFollowPostback =
+  const isVerifyFollowEvent =
     event.postback?.payload === VERIFY_FOLLOW_PAYLOAD ||
-    event.postback?.title === VERIFY_FOLLOW_BUTTON_TITLE;
+    event.postback?.title === VERIFY_FOLLOW_BUTTON_TITLE ||
+    event.message?.quick_reply?.payload === VERIFY_FOLLOW_PAYLOAD ||
+    event.message?.text?.trim() === VERIFY_FOLLOW_BUTTON_TITLE;
 
-  if (!isVerifyFollowPostback) {
+  if (!isVerifyFollowEvent) {
     return;
   }
 
@@ -356,7 +391,7 @@ async function handlePostbackEvent(
     .from('ig_automations')
     .select('*')
     .eq('id', userState.last_automation_id)
-    .maybeSingle<IgAutomation>();
+    .maybeSingle<IgAutomation & Record<string, unknown>>();
 
   if (autoError || !automation) {
     console.error('[IG Webhook] Automation not found for user state:', autoError);
@@ -378,11 +413,13 @@ async function handlePostbackEvent(
       console.error('[IG Webhook] Failed to mark user verified:', updateError);
     }
 
+    const targetUrl = resolveTargetUrl(automation);
+
     await sendSuccessLinkDm(
       igAccountId,
       igUserId,
       automation.success_message?.trim() || DEFAULT_SUCCESS_MESSAGE,
-      automation.target_url,
+      targetUrl,
       accessToken
     );
     return;
